@@ -13,12 +13,19 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 import psycopg2, os
 from dotenv import load_dotenv
+import yagmail
+
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = "abgshdfehjijldsloaudmz23kdad8BghAka"
+app.config['SECRET_KEY'] = os.getenv("FLASK_KEY")
 ckeditor = CKEditor(app)
 Bootstrap5(app)
 
+# Configuration for your email
+YAGMAIL_USER = os.getenv("USER_EMAIL")  # Your Gmail address
+YAGMAIL_PASSWORD = os.getenv("PASSWORD")  # Your Gmail password (or app password)
+TO_EMAIL = os.getenv("TO_EMAIL") # The email where you want to receive contact form submissions
 
 # TODO: Configure Flask-Login
 login_manager = LoginManager()
@@ -29,7 +36,7 @@ login_manager.login_message = "Please log in to access this page."
 # CREATE DATABASE
 class Base(DeclarativeBase):
     pass
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DB_URI")
 engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI']) #create engine
 Session = sessionmaker(bind=engine) #create session
 db = SQLAlchemy(model_class=Base)
@@ -247,10 +254,36 @@ def about():
     return render_template("about.html")
 
 
-@app.route("/contact")
+@app.route("/contact", methods = ["GET", "POST"])
 def contact():
+    if request.method == "POST":
+        name = request.form["name"]
+        email = request.form["email"]
+        message = request.form["message"]
+        try:
+            # Initialize yagmail and send the email.
+            yag = yagmail.SMTP(user=YAGMAIL_USER, password=YAGMAIL_PASSWORD)
+            contents = [
+                f"Name: {name}",
+                f"Email: {email}",
+                f"Message: {message}",
+            ]
+            yag.send(
+                to=TO_EMAIL,
+                subject=f"New Contact Form Submission from {name}",
+                contents=contents,
+            )
+            yag.close()  # explicitly close the connection
+
+            flash('Your message has been sent successfully!', 'success')  # use flash
+            return redirect(url_for('contact', msg_sent = "Succesful"))  # Redirect to the contact page to clear the form
+        except Exception as e:
+            # Handle errors during email sending.  Important!
+            flash(f'An error occurred while sending your message: {e}', 'error')
+            return render_template('contact.html')  # Render the template again, so the user doesn't lose their input
+        # If the form is not submitted or the data is invalid, render the contact page.
     return render_template("contact.html")
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5002)
+    app.run(debug=False, port=5002)
