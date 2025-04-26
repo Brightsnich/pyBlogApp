@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 import yagmail
 
 load_dotenv()
-
+print(f"yagmail version: {yagmail.__version__}")
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv("FLASK_KEY")
 ckeditor = CKEditor(app)
